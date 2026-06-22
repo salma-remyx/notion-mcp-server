@@ -25,62 +25,102 @@ type NewToolDefinition = {
 
 /**
  * Recursively deserialize stringified JSON values in parameters.
- * This handles the case where MCP clients (like Cursor, Claude Code) double-serialize
- * nested object parameters, sending them as JSON strings instead of objects.
+ * This handles the case where MCP clients (like Cursor, Claude Code, and some
+ * SDKs) double-serialize nested object/array parameters, sending them as JSON
+ * strings instead of structured values.
+ *
+ * The whole argument tree is walked uniformly: every object property and every
+ * array element is visited, JSON-looking strings are decoded, and the decoded
+ * result is walked again. This normalizes deeply nested cases — including a
+ * stringified object that sits inside an array element object (e.g.
+ * `{ children: [{ paragraph: '{"rich_text":[...]}' }] }`) and values that were
+ * JSON-encoded more than once (e.g. `JSON.stringify(JSON.stringify(parent))`) —
+ * before the request is forwarded to the Notion API.
  *
  * @see https://github.com/makenotion/notion-mcp-server/issues/176
  */
 function deserializeParams(params: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
-
   for (const [key, value] of Object.entries(params)) {
-    if (typeof value === 'string') {
-      // Check if the string looks like a JSON object or array
-      const trimmed = value.trim()
-      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
-        try {
-          const parsed = JSON.parse(value)
-          // Only use parsed value if it's an object or array
-          if (typeof parsed === 'object' && parsed !== null) {
-            // Recursively deserialize nested objects
-            result[key] = Array.isArray(parsed)
-              ? parsed
-              : deserializeParams(parsed as Record<string, unknown>)
-            continue
-          }
-        } catch {
-          // If parsing fails, keep the original string value
-        }
-      }
-    } else if (Array.isArray(value)) {
-      // Deserialize any JSON-string items within the array
-      result[key] = value.map((item) => {
-        if (typeof item !== 'string') return item
-        const trimmed = item.trim()
-        if (
-          (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-          (trimmed.startsWith('[') && trimmed.endsWith(']'))
-        ) {
-          try {
-            const parsed = JSON.parse(item)
-            if (typeof parsed === 'object' && parsed !== null) {
-              return Array.isArray(parsed)
-                ? parsed
-                : deserializeParams(parsed as Record<string, unknown>)
-            }
-          } catch {
-            // If parsing fails, keep the original string item
-          }
-        }
-        return item
-      })
-      continue
-    }
-    result[key] = value
+    result[key] = deserializeValue(value)
+  }
+  return result
+}
+
+/**
+ * Normalize a single value: decode a JSON-encoded string into the structured
+ * value it represents (recursing into the result), walk into every array
+ * element, and walk into every nested object property. Non-JSON strings and
+ * scalars are returned unchanged, so values the schema legitimately wants as
+ * strings (and numbers/booleans encoded as strings) are left intact.
+ */
+function deserializeValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return unwrapJsonString(value)
   }
 
-  return result
+  if (Array.isArray(value)) {
+    return value.map(deserializeValue)
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    const result: Record<string, unknown> = {}
+    for (const [key, nested] of Object.entries(value)) {
+      result[key] = deserializeValue(nested)
+    }
+    return result
+  }
+
+  return value
+}
+
+// Bound how many JSON-decode passes we attempt on a single string. One pass
+// handles the common single-encoding; extra passes absorb double/triple
+// serialization without unbounded work on adversarial input.
+const MAX_UNWRAP_DEPTH = 3
+
+/**
+ * Resolve a (possibly multiply-)JSON-encoded string to the object or array it
+ * represents. Only strings that ultimately decode to an object or array are
+ * transformed (and then recursively normalized); a string that decodes to a
+ * scalar (number/boolean/null) or to another plain string is returned
+ * unchanged, so genuine string values are never corrupted.
+ */
+function unwrapJsonString(value: string): unknown {
+  let current = value
+  for (let depth = 0; depth < MAX_UNWRAP_DEPTH; depth++) {
+    const trimmed = current.trim()
+    // Only attempt a parse when the string could encode an object/array
+    // (`{...}`/`[...]`) or wrap one in a JSON string literal (`"..."`). This
+    // skips the common case of ordinary text without touching JSON.parse.
+    const couldBeEncoded =
+      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+      (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+      (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    if (!couldBeEncoded) {
+      break
+    }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      break
+    }
+
+    if (typeof parsed === 'object' && parsed !== null) {
+      return deserializeValue(parsed)
+    }
+    if (typeof parsed === 'string') {
+      // Peeled one layer of JSON-string encoding; loop to see whether it wraps
+      // a structured value (double-encoding).
+      current = parsed
+      continue
+    }
+    // Decoded to a scalar — not a structured value; leave the original intact.
+    break
+  }
+  return value
 }
 
 // import this class, extend and return server
