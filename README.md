@@ -445,6 +445,50 @@ Notes:
   prefer keeping the server's own bearer auth (`--auth-token`) enabled as a
   gateway in front of multi-tenant traffic.
 
+### Tool gating and lazy schemas (optional)
+
+By default the server eagerly advertises every OpenAPI-derived tool — name,
+full description, and full input schema — on every `tools/list` response. In a
+large API this per-turn payload inflates the agent's context (the "MCP Tax"). To
+trim it, you can enable **tool gating** (expose only a relevant subset of tools)
+and **lazy schemas** (collapse each tool's verbose description to its one-line
+summary at list time). The full input schema is always forwarded, so gated-in
+tools stay callable. All knobs are optional and default to off (legacy
+behaviour).
+
+Configure via environment variables:
+
+| Variable | Values | Effect |
+| --- | --- | --- |
+| `MCP_TOOL_GATING_MODE` | `off` (default), `read-only`, `category`, `names` | `read-only` exposes GETs only; `category`/`names` restrict to the lists below. |
+| `MCP_TOOL_GATING_CATEGORIES` | comma-separated, e.g. `pages,databases` | Used with `category` mode; category is derived from the OpenAPI path (e.g. `/v1/pages/{id}` → `pages`). |
+| `MCP_TOOL_GATING_NAMES` | comma-separated tool names, e.g. `API-getPage` | Used with `names` mode. |
+| `MCP_TOOL_GATING_LAZY_SCHEMA` | `1` / `true` | Drops the per-tool "Error Responses" block from the listing description. |
+
+Example (read-only + lazy schemas over STDIO):
+
+```json
+{
+  "mcpServers": {
+    "notion": {
+      "command": "npx",
+      "args": ["-y", "@notionhq/notion-mcp-server"],
+      "env": {
+        "NOTION_TOKEN": "ntn_****",
+        "MCP_TOOL_GATING_MODE": "read-only",
+        "MCP_TOOL_GATING_LAZY_SCHEMA": "1"
+      }
+    }
+  }
+}
+```
+
+This is an adapted port of *Tool Attention Is All You Need: Dynamic Tool Gating
+and Lazy Schema Loading for Eliminating the MCP/Tools Tax in Scalable Agentic
+Workflows* (arXiv:2604.21816v1): the paper's two mechanisms are kept (dynamic
+gating + lazy loading), while its *learned* Tool Attention scorer is replaced
+with the deterministic metadata gates above.
+
 ### Examples
 
 1. Using the following instruction

@@ -5,6 +5,11 @@ import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+import {
+  gatingOptionsFromEnv,
+  selectTool,
+  type ToolGatingOptions,
+} from './tool-gating'
 
 type PathItemObject = OpenAPIV3.PathItemObject & {
   get?: OpenAPIV3.OperationObject
@@ -129,14 +134,25 @@ export class MCPProxy {
   private httpClient: HttpClient
   private tools: Record<string, NewToolDefinition>
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
+  private gatingOptions: ToolGatingOptions
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
    *   headers are resolved from the environment (`OPENAPI_MCP_HEADERS` /
    *   `NOTION_TOKEN`). The HTTP transport passes per-connection headers here so a
    *   single deployment can serve multiple Notion integrations.
+   * @param gatingOptions Optional tool-gating / lazy-schema config (adapted from
+   *   arXiv:2604.21816v1) that trims which tools — and how much of each tool's
+   *   description — is injected per `tools/list` turn. When omitted, options are
+   *   resolved from the environment (`MCP_TOOL_GATING_*`); the default is
+   *   `mode: 'off'`, preserving the legacy all-tools behaviour.
    */
-  constructor(name: string, openApiSpec: OpenAPIV3.Document, headers?: Record<string, string>) {
+  constructor(
+    name: string,
+    openApiSpec: OpenAPIV3.Document,
+    headers?: Record<string, string>,
+    gatingOptions?: ToolGatingOptions,
+  ) {
     this.server = new Server({ name, version: '1.0.0' }, { capabilities: { tools: {} } })
     const baseUrl = openApiSpec.servers?.[0].url
     if (!baseUrl) {
@@ -155,6 +171,7 @@ export class MCPProxy {
     const { tools, openApiLookup } = converter.convertToMCPTools()
     this.tools = tools
     this.openApiLookup = openApiLookup
+    this.gatingOptions = gatingOptions ?? gatingOptionsFromEnv()
 
     this.setupHandlers()
   }
@@ -175,10 +192,28 @@ export class MCPProxy {
           const httpMethod = operation?.method?.toLowerCase();
           const isReadOnly = httpMethod === 'get';
 
+          // Apply dynamic tool gating + lazy schema loading (arXiv:2604.21816v1):
+          // drop tools the gate rejects, and collapse the description to a
+          // one-line summary when lazy mode is on. The inputSchema is always
+          // forwarded so gated-in tools remain callable.
+          const selected = selectTool(
+            {
+              name: truncatedToolName,
+              description: method.description,
+              inputSchema: method.inputSchema,
+              method: httpMethod ?? '',
+              path: operation?.path ?? '',
+            },
+            this.gatingOptions,
+          )
+          if (!selected) {
+            return
+          }
+
           tools.push({
-            name: truncatedToolName,
-            description: method.description,
-            inputSchema: method.inputSchema as Tool['inputSchema'],
+            name: selected.name,
+            description: selected.description,
+            inputSchema: selected.inputSchema as Tool['inputSchema'],
             annotations: {
               title: this.operationIdToTitle(method.name),
               ...(isReadOnly
