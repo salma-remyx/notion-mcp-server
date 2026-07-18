@@ -81,6 +81,20 @@ describe('evaluateWriteGate', () => {
     expect((decision as { reason: string }).reason).toContain('db-not-allowed')
   })
 
+  it('never gates a non-GET query endpoint that carries a target id (issue #333)', () => {
+    // query-data-source is POST /v1/data_sources/{data_source_id}/query — a read
+    // that carries data_source_id. An allowlist must not deny it as a write.
+    const decision = evaluateWriteGate(
+      { operationId: 'query-data-source', method: 'post', path: '/data_sources/{data_source_id}/query' } as OpenAPIV3.OperationObject & {
+        method: string
+        path: string
+      },
+      { data_source_id: 'ds-not-on-allowlist', filter: {} },
+      { enabled: true, allowedTargetIds: ['only-this'], deniedOperations: [] },
+    )
+    expect(decision.allowed).toBe(true)
+  })
+
   it('fails open when a write has no inspectable target id', () => {
     const decision = evaluateWriteGate(
       { operationId: 'search', method: 'post', path: '/search' } as OpenAPIV3.OperationObject & {
@@ -190,6 +204,30 @@ describe('write gate wired into MCPProxy call-tool handler', () => {
     expect(payload.status).toBe('error')
     expect(payload.message).toContain('write gate')
     expect(payload.message).toContain('dangerous-page')
+  })
+
+  it('lets a non-GET read (query-data-source) through even with an allowlist set', async () => {
+    ;(HttpClient.prototype.executeOperation as ReturnType<typeof vi.fn>).mockResolvedValue(mockSuccess)
+    ;(proxy as unknown as { openApiLookup: Record<string, unknown> }).openApiLookup = {
+      'notion-query-data-source': {
+        operationId: 'query-data-source',
+        method: 'post',
+        path: '/data_sources/{data_source_id}/query',
+        responses: { '200': { description: 'Success' } },
+      },
+    }
+    // Allowlist would otherwise reject this data source — but a read must pass.
+    ;(proxy as unknown as { writeGatePolicy: { enabled: boolean; allowedTargetIds: string[] } }).writeGatePolicy = {
+      enabled: true,
+      allowedTargetIds: ['some-other-ds'],
+    }
+
+    const result = (await callToolHandler({
+      params: { name: 'notion-query-data-source', arguments: { data_source_id: 'ds-123', filter: {} } },
+    })) as { content: { text: string }[] }
+
+    expect(HttpClient.prototype.executeOperation).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(result.content[0].text)).toEqual({ id: 'ok' })
   })
 
   it('lets an allowed write through to the Notion API', async () => {

@@ -541,7 +541,12 @@ Two Notion-native gates are evaluated, in order, on every non-`GET` call:
 - **target-allowlist** — when `allowedTargetIds` is set, denies any write whose
   target id (`page_id`, `block_id`, `database_id`, `data_source_id`, including
   those nested under `parent`/`new_parent`) is missing from the allowlist.
-  Reads (`GET`) always pass; writes with no inspectable target id fail open.
+  Reads always pass; writes with no inspectable target id fail open.
+
+Reads are never gated. This covers `GET` calls and the non-`GET` query endpoints
+Notion models as `POST` (`post-search`, `query-data-source`), so an allowlist
+never blocks a legitimate search or data-source query even when it carries a
+`data_source_id` outside the list.
 
 This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing

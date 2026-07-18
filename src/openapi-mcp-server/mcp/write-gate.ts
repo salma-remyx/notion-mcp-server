@@ -59,7 +59,34 @@ const TARGET_ID_KEYS = [
   'user_id',
 ]
 
+/**
+ * Operation ids that are reads despite using a non-`GET` verb. Notion models a
+ * few query endpoints as `POST` (they carry a request body) even though they
+ * never mutate state — e.g. `query-data-source` is `POST
+ * /v1/data_sources/{data_source_id}/query`, a read that carries a
+ * `data_source_id`. Verb-derived tool annotations mislabel these as destructive
+ * (makenotion/notion-mcp-server#333). The gate must never deny a read, so these
+ * are classified as reads regardless of method or the target id they carry.
+ */
+const READ_OPERATION_IDS = new Set(['post-search', 'query-data-source'])
+
 const DISABLED_POLICY: WriteGatePolicy = { enabled: false }
+
+/**
+ * Deterministically classify a proposed call as a read.
+ *
+ * Reads are never gated: the paper's failure mode is a policy-violating *write*
+ * (a forbidden state transition), and its negative-control result shows gates
+ * should stay out of the way of calls that don't mutate state. A read misfiring
+ * as a write — e.g. an allowlist denying a legitimate `query-data-source` on a
+ * data source outside the list — is exactly the regression this guards against.
+ */
+export function isReadOperation(operation: { method?: string; operationId?: string }): boolean {
+  if (operation.method?.toLowerCase() === 'get') {
+    return true
+  }
+  return operation.operationId ? READ_OPERATION_IDS.has(operation.operationId.toLowerCase()) : false
+}
 
 /**
  * Load the write-gate policy from the `NOTION_WRITE_GATE` environment variable.
@@ -133,10 +160,10 @@ function extractTargetIds(params: Record<string, unknown>): string[] {
 /**
  * Evaluate the write-gate suite against a proposed call.
  *
- * Pure, deterministic, side-effect-free. Reads (`GET`) are always allowed; only
- * writes are gated — the paper's policy-violating-write failure mode only
- * applies to writes, and the tool-execution boundary already marks `GET` as
- * read-only.
+ * Pure, deterministic, side-effect-free. Reads are always allowed (see
+ * `isReadOperation` — `GET` plus the non-`GET` query endpoints); only writes are
+ * gated, since the paper's policy-violating-write failure mode applies only to
+ * calls that mutate state.
  */
 export function evaluateWriteGate(
   operation: OpenAPIV3.OperationObject & { method: string },
@@ -147,7 +174,7 @@ export function evaluateWriteGate(
     return { allowed: true }
   }
 
-  if (operation.method?.toLowerCase() === 'get') {
+  if (isReadOperation(operation)) {
     return { allowed: true }
   }
 
