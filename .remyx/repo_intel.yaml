@@ -1,0 +1,17 @@
+schema_version: 1
+fork: salma-remyx/notion-mcp-server
+observed_landing_zones:
+- path: src/openapi-mcp-server/mcp/
+  shape_tags:
+  - unclassified
+  confirmed_by:
+  - arxiv: 2607.07405v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: "MCPProxy.setupHandlers() CallToolRequest handler in src/openapi-mcp-server/mcp/proxy.ts\
+      \ \u2014 invoked on every MCP tool call; MCPProxy is constructed at src/init-server.ts:51"
+    branch: reason-less-verify-more-deterministic-gates-recover-a-silent
+    timestamp: '2026-07-18T02:46:51Z'
+  last_observed: '2026-07-18T02:46:51Z'
+rejected_shapes: []
+coordination_signals: []
+last_updated: '2026-07-18T02:46:51Z'
