@@ -3,6 +3,7 @@ import { CallToolRequestSchema, JSONRPCResponse, ListToolsRequestSchema, Tool } 
 import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
+import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -129,6 +130,8 @@ export class MCPProxy {
   private httpClient: HttpClient
   private tools: Record<string, NewToolDefinition>
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
+  // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
+  private writeGatePolicy: WriteGatePolicy
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -155,6 +158,7 @@ export class MCPProxy {
     const { tools, openApiLookup } = converter.convertToMCPTools()
     this.tools = tools
     this.openApiLookup = openApiLookup
+    this.writeGatePolicy = loadWriteGatePolicy()
 
     this.setupHandlers()
   }
@@ -205,6 +209,29 @@ export class MCPProxy {
       // Deserialize any stringified JSON parameters (fixes double-serialization bug)
       // See: https://github.com/makenotion/notion-mcp-server/issues/176
       const deserializedParams = params ? deserializeParams(params as Record<string, unknown>) : {}
+
+      // Deterministic pre-execution write gate: inspect the proposed call against
+      // the operator's policy before any write reaches the Notion API. A denial
+      // returns a structured error (same shape as HttpClientError) instead of
+      // executing, deterministically preventing policy-violating writes.
+      const gateDecision = evaluateWriteGate(operation, deserializedParams, this.writeGatePolicy)
+      if (!gateDecision.allowed) {
+        console.warn('Pre-execution write gate denied operation', {
+          operationId: operation.operationId,
+          gate: gateDecision.gate,
+        })
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                status: 'error',
+                message: `Operation denied by pre-execution write gate (${gateDecision.gate}): ${gateDecision.reason}`,
+              }),
+            },
+          ],
+        }
+      }
 
       try {
         // Execute the operation
