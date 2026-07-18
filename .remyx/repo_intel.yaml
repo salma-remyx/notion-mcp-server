@@ -11,7 +11,12 @@ observed_landing_zones:
       \ \u2014 invoked on every MCP tool call; MCPProxy is constructed at src/init-server.ts:51"
     branch: reason-less-verify-more-deterministic-gates-recover-a-silent
     timestamp: '2026-07-18T02:46:51Z'
-  last_observed: '2026-07-18T02:46:51Z'
+  - arxiv: 2604.21816v1
+    mode: ''
+    call_site_specifics: ''
+    branch: tool-attention-is-all-you-need-dynamic-tool-gating-and-lazy-
+    timestamp: '2026-07-18T22:17:35Z'
+  last_observed: '2026-07-18T22:17:35Z'
 rejected_shapes: []
 coordination_signals: []
-last_updated: '2026-07-18T02:46:51Z'
+last_updated: '2026-07-18T22:17:35Z'
