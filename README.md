@@ -507,3 +507,48 @@ Testing changes locally in Cursor:
 npm login
 npm publish --access public
 ```
+
+---
+
+### Pre-execution write gates (optional)
+
+Because a well-formed Notion API call can mutate workspace state with no tool
+error, an LLM agent can make an unauthorized write (edit the wrong page, archive
+a page, move content) while appearing to succeed. The server ships an optional
+**deterministic pre-execution write gate** (adapted from research on
+deterministic gates for tool-using LLM agents) that inspects each proposed call
+against an operator-defined policy *before* any write reaches the Notion API,
+and denies forbidden writes — returning a structured error to the agent instead
+of executing.
+
+The gate is **off by default** (zero behavior change). Enable it with the
+`NOTION_WRITE_GATE` environment variable:
+
+```bash
+# Enable with no rules (no-op until you add rules)
+NOTION_WRITE_GATE=true npx @notionhq/notion-mcp-server
+
+# Deny specific destructive operations outright (by operationId), and/or
+# restrict writes to an allowlist of target resource IDs.
+NOTION_WRITE_GATE='{"enabled":true,"deniedOperations":["archive-a-page","delete-a-block"],"allowedTargetIds":["page-abc","page-def"]}' \
+  npx @notionhq/notion-mcp-server
+```
+
+Two Notion-native gates are evaluated, in order, on every non-`GET` call:
+
+- **denied-operation** — denies any call whose `operationId` is on
+  `deniedOperations` (matched case-insensitively).
+- **target-allowlist** — when `allowedTargetIds` is set, denies any write whose
+  target id (`page_id`, `block_id`, `database_id`, `data_source_id`, including
+  those nested under `parent`/`new_parent`) is missing from the allowlist.
+  Reads always pass; writes with no inspectable target id fail open.
+
+Reads are never gated. This covers `GET` calls and the non-`GET` query endpoints
+Notion models as `POST` (`post-search`, `query-data-source`), so an allowlist
+never blocks a legitimate search or data-source query even when it carries a
+`data_source_id` outside the list.
+
+This is a deterministic safety net, not authorization — it complements (does
+not replace) your integration's Notion _Capabilities_ and the existing
+limits on which endpoints are exposed.
+
