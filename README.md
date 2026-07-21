@@ -552,3 +552,47 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+---
+
+### State-aware write gates (optional)
+
+The pre-execution write gate above inspects only the *proposed call*. It cannot
+see whether the target's **current state** already forbids the transition — for
+example, writing to a page that has since been archived (trashed). The server
+ships an optional companion gate (adapted from the same research on deterministic
+gates for tool-using LLM agents) that performs a **read-only round-trip at the
+action boundary**: before a write reaches the Notion API, it retrieves the target
+resource's current state and denies the write if a state predicate fires. This is
+the "read the world before a write" pattern that catches the silent wrong-state
+the call-only gate cannot.
+
+The gate is **off by default** (zero behavior change, no extra API calls). Enable
+it with the `NOTION_STATE_GATE` environment variable:
+
+```bash
+# Enable with the default predicate (deny writes to archived resources)
+NOTION_STATE_GATE=true npx @notionhq/notion-mcp-server
+
+# Or express the full policy as JSON
+NOTION_STATE_GATE='{"enabled":true,"denyWritesToArchived":true}' \
+  npx @notionhq/notion-mcp-server
+```
+
+State predicate evaluated on every write whose target can be resolved to a read
+(`page_id`, `block_id`, `database_id`, `data_source_id`, `comment_id`):
+
+- **state-archived-target** — denies a write when the target resource's current
+  state is `archived`, preventing edits to trashed/dead resources that the agent
+  believes succeeded.
+
+The round-trip runs only for writes; reads are never round-tripped. If the gate
+cannot resolve a read for the target, cannot find the read operation, or the
+state read itself errors, it **fails open** (the write proceeds) so the
+round-trip can never block a legitimate write on its own account. Both gates
+compose: the call-only gate runs first (cheap, no I/O), and only if it passes
+does the state-aware gate pay for the read.
+
+This is a deterministic safety net, not authorization — it complements (does
+not replace) your integration's Notion _Capabilities_, the call-only gate, and
+the existing limits on which endpoints are exposed.
+
