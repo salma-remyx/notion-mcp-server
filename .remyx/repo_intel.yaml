@@ -7,16 +7,17 @@ observed_landing_zones:
   confirmed_by:
   - arxiv: 2607.07405v1
     mode: Mode 2 (adapted port)
-    call_site_specifics: "MCPProxy.setupHandlers() CallToolRequest handler in src/openapi-mcp-server/mcp/proxy.ts\
-      \ \u2014 invoked on every MCP tool call; MCPProxy is constructed at src/init-server.ts:51"
-    branch: reason-less-verify-more-deterministic-gates-recover-a-silent
-    timestamp: '2026-07-18T02:46:51Z'
+    call_site_specifics: "MCPProxy.setupHandlers() \u2192 CallToolRequestSchema handler\
+      \ in src/openapi-mcp-server/mcp/proxy.ts:252 (the pre-existing per-tool-call\
+      \ execution path); runs after evaluateWriteGate and before this.httpCl"
+    branch: reason-less-verify-more-deterministic-gates-recover-a-silent-v2
+    timestamp: '2026-07-21T04:33:15Z'
   - arxiv: 2604.21816v1
     mode: ''
     call_site_specifics: ''
     branch: tool-attention-is-all-you-need-dynamic-tool-gating-and-lazy-
     timestamp: '2026-07-18T22:17:35Z'
-  last_observed: '2026-07-18T22:17:35Z'
+  last_observed: '2026-07-21T04:33:15Z'
 rejected_shapes: []
 coordination_signals: []
-last_updated: '2026-07-18T22:17:35Z'
+last_updated: '2026-07-21T04:33:15Z'
