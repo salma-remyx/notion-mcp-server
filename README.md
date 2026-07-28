@@ -567,10 +567,14 @@ the "read the world before a write" pattern that catches the silent wrong-state
 the call-only gate cannot.
 
 The gate is **off by default** (zero behavior change, no extra API calls). Enable
-it with the `NOTION_STATE_GATE` environment variable:
+it with the `--state-gate` CLI flag or the `NOTION_STATE_GATE` environment
+variable:
 
 ```bash
 # Enable with the default predicate (deny writes to archived resources)
+npx @notionhq/notion-mcp-server --state-gate
+
+# Same via the environment variable
 NOTION_STATE_GATE=true npx @notionhq/notion-mcp-server
 
 # Or express the full policy as JSON
