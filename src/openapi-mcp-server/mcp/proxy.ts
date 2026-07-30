@@ -4,6 +4,11 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import {
+  loadStateAwareGatePolicy,
+  runStateAwareGate,
+  type StateAwareGatePolicy,
+} from './state-aware-gate'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -132,6 +137,9 @@ export class MCPProxy {
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
+  // Deterministic state-aware gate policy — the "read the world before a write"
+  // round-trip (default off — see state-aware-gate.ts).
+  private stateGatePolicy: StateAwareGatePolicy
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -159,6 +167,7 @@ export class MCPProxy {
     this.tools = tools
     this.openApiLookup = openApiLookup
     this.writeGatePolicy = loadWriteGatePolicy()
+    this.stateGatePolicy = loadStateAwareGatePolicy()
 
     this.setupHandlers()
   }
@@ -227,6 +236,42 @@ export class MCPProxy {
               text: JSON.stringify({
                 status: 'error',
                 message: `Operation denied by pre-execution write gate (${gateDecision.gate}): ${gateDecision.reason}`,
+              }),
+            },
+          ],
+        }
+      }
+
+      // State-aware "read the world before a write" gate — the action-boundary
+      // round-trip the parameter-free gate defers (see state-aware-gate.ts). For
+      // a write whose target we can resolve a read for, fetch its current state
+      // and deny if a state predicate fires (e.g. the target is archived). Runs
+      // only when an operator opts in; reads are never round-tripped; any
+      // failure to resolve or read the state fails open so a legitimate write is
+      // never blocked by the round-trip itself.
+      const stateDecision = await runStateAwareGate(operation, deserializedParams, this.stateGatePolicy, {
+        resolveReadOperation: (id: string) =>
+          Object.values(this.openApiLookup).find((op) => op.operationId === id) ?? null,
+        readState: async (op, readParams) =>
+          (
+            await this.httpClient.executeOperation(
+              op as OpenAPIV3.OperationObject & { method: string; path: string },
+              readParams,
+            )
+          ).data,
+      })
+      if (!stateDecision.allowed) {
+        console.warn('Pre-execution state gate denied operation', {
+          operationId: operation.operationId,
+          gate: stateDecision.gate,
+        })
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                status: 'error',
+                message: `Operation denied by pre-execution state gate (${stateDecision.gate}): ${stateDecision.reason}`,
               }),
             },
           ],
