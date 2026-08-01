@@ -17,7 +17,14 @@ observed_landing_zones:
     call_site_specifics: ''
     branch: tool-attention-is-all-you-need-dynamic-tool-gating-and-lazy-
     timestamp: '2026-07-18T22:17:35Z'
-  last_observed: '2026-07-21T04:33:15Z'
+  - arxiv: 2509.18420v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: The CallToolRequestSchema request handler inside MCPProxy.setupHandlers()
+      (src/openapi-mcp-server/mcp/proxy.ts:228), reached via the production server
+      entry point scripts/start-server.ts -> initProxy(
+    branch: instruction-following-evaluation-in-function-calling-for-lar
+    timestamp: '2026-08-01T14:33:47Z'
+  last_observed: '2026-08-01T14:33:47Z'
 - path: src/openapi-mcp-server/openapi/
   shape_tags:
   - unclassified
@@ -38,4 +45,4 @@ rejected_shapes:
   - arxiv: 2607.19257v1
     timestamp: '2026-07-30T17:29:36Z'
 coordination_signals: []
-last_updated: '2026-08-01T00:08:38Z'
+last_updated: '2026-08-01T14:33:47Z'
