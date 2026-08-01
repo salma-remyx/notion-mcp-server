@@ -33,8 +33,7 @@ exports[`Notion OpenAPI spec -> MCP tools (snapshot) > generates stable tool def
 [
   {
     "description": "Notion | Create comment
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "create-a-comment",
     "properties": [
@@ -48,8 +47,7 @@ Error Responses:
   },
   {
     "description": "Notion | Create a data source
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "create-a-data-source",
     "properties": [
@@ -64,8 +62,7 @@ Error Responses:
   },
   {
     "description": "Notion | Delete a block
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "delete",
     "name": "delete-a-block",
     "properties": [
@@ -77,8 +74,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve block children
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "get-block-children",
     "properties": [
@@ -92,8 +88,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve your token's bot user
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "get-self",
     "properties": [],
@@ -101,8 +96,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a user
-Error Responses:
-400: 400",
+Errors: 400",
     "httpMethod": "get",
     "name": "get-user",
     "properties": [
@@ -114,8 +108,7 @@ Error Responses:
   },
   {
     "description": "Notion | List all users
-Error Responses:
-400: 400",
+Errors: 400",
     "httpMethod": "get",
     "name": "get-users",
     "properties": [
@@ -126,8 +119,7 @@ Error Responses:
   },
   {
     "description": "Notion | List templates in a data source
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "list-data-source-templates",
     "properties": [
@@ -141,8 +133,7 @@ Error Responses:
   },
   {
     "description": "Notion | Move a page
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "move-page",
     "properties": [
@@ -156,8 +147,7 @@ Error Responses:
   },
   {
     "description": "Notion | Append block children
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "patch",
     "name": "patch-block-children",
     "properties": [
@@ -172,8 +162,7 @@ Error Responses:
   },
   {
     "description": "Notion | Update page properties
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "patch",
     "name": "patch-page",
     "properties": [
@@ -190,8 +179,7 @@ Error Responses:
   },
   {
     "description": "Notion | Create a page
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "post-page",
     "properties": [
@@ -208,8 +196,7 @@ Error Responses:
   },
   {
     "description": "Notion | Search by title
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "post-search",
     "properties": [
@@ -223,8 +210,7 @@ Error Responses:
   },
   {
     "description": "Notion | Query a data source
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "post",
     "name": "query-data-source",
     "properties": [
@@ -243,8 +229,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a block
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-block",
     "properties": [
@@ -256,8 +241,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve comments
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-comment",
     "properties": [
@@ -271,8 +255,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a data source
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-data-source",
     "properties": [
@@ -284,8 +267,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a database
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-database",
     "properties": [
@@ -297,8 +279,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a page
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-page",
     "properties": [
@@ -311,8 +292,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a page property item
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "get",
     "name": "retrieve-a-page-property",
     "properties": [
@@ -328,11 +308,7 @@ Error Responses:
   },
   {
     "description": "Notion | Retrieve a page as Markdown
-Error Responses:
-400: Bad request
-403: The integration lacks the read/update content capability required for this page.
-404: Page not found or not shared with the integration.
-429: Rate limited.",
+Errors: 400, 403: The integration lacks the read/update content capability required for this page., 404: Page not found or not shared with the integration., 429",
     "httpMethod": "get",
     "name": "retrieve-page-markdown",
     "properties": [
@@ -345,8 +321,7 @@ Error Responses:
   },
   {
     "description": "Notion | Update a block
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "patch",
     "name": "update-a-block",
     "properties": [
@@ -360,8 +335,7 @@ Error Responses:
   },
   {
     "description": "Notion | Update a data source
-Error Responses:
-400: Bad request",
+Errors: 400",
     "httpMethod": "patch",
     "name": "update-a-data-source",
     "properties": [
@@ -376,12 +350,7 @@ Error Responses:
   },
   {
     "description": "Notion | Update a page's content as Markdown
-Error Responses:
-400: Bad request
-403: The integration lacks the read/update content capability required for this page.
-404: Page not found or not shared with the integration.
-409: Conflict (e.g. row limit exceeded).
-429: Rate limited.",
+Errors: 400, 403: The integration lacks the read/update content capability required for this page., 404: Page not found or not shared with the integration., 409: Conflict (e.g. row limit exceeded)., 429",
     "httpMethod": "patch",
     "name": "update-page-markdown",
     "properties": [

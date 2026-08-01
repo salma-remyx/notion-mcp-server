@@ -1,5 +1,6 @@
 import type { OpenAPIV3, OpenAPIV3_1 } from 'openapi-types'
 import type { JSONSchema7 as IJsonSchema } from 'json-schema'
+import { condenseErrorResponses } from './description-condenser'
 
 type NewToolMethod = {
   name: string
@@ -450,10 +451,16 @@ export class OpenAPIToMCPConverter {
   }
 
   private getDescription(description: string): string {
+    // Condense the per-tool Error Responses block: "Prompt Design at Scale"
+    // (arXiv:2607.19257) finds added instruction surface is pure token
+    // overhead and instruction count degrades adherence, with no format
+    // benefit. Drop the HTTP-standard boilerplate (its meaning is implied by
+    // the code) and collapse the block, keeping only tool-specific detail.
+    const condensed = condenseErrorResponses(description)
     // Only add "Notion | " prefix for the Notion API
     if (this.openApiSpec.info.title === 'Notion API') {
-      return "Notion | " + description
+      return 'Notion | ' + condensed
     }
-    return description
+    return condensed
   }
 }
