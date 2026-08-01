@@ -18,6 +18,18 @@ observed_landing_zones:
     branch: tool-attention-is-all-you-need-dynamic-tool-gating-and-lazy-
     timestamp: '2026-07-18T22:17:35Z'
   last_observed: '2026-07-21T04:33:15Z'
+- path: src/openapi-mcp-server/openapi/
+  shape_tags:
+  - unclassified
+  confirmed_by:
+  - arxiv: 2607.19257v1
+    mode: Mode 3 (inspired experiment)
+    call_site_specifics: OpenAPIToMCPConverter.getDescription() in openapi/parser.ts
+      (the private description helper), which runs for every method at parser.ts:186
+      inside convertToMCPTools(), consumed by MCPProxy.setupHandler
+    branch: prompt-design-at-scale-how-format-instruction-count-and-cont
+    timestamp: '2026-08-01T00:08:38Z'
+  last_observed: '2026-08-01T00:08:38Z'
 rejected_shapes:
 - shape_tag: null
   reason_code: null
@@ -26,4 +38,4 @@ rejected_shapes:
   - arxiv: 2607.19257v1
     timestamp: '2026-07-30T17:29:36Z'
 coordination_signals: []
-last_updated: '2026-07-30T17:29:36Z'
+last_updated: '2026-08-01T00:08:38Z'
