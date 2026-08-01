@@ -4,6 +4,7 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import { coerceParamFormats } from './format-coerce'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -130,6 +131,9 @@ export class MCPProxy {
   private httpClient: HttpClient
   private tools: Record<string, NewToolDefinition>
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
+  // Flattened inputSchema per tool (keyed identically to openApiLookup) so the
+  // format-coercion pass can repair schema-violating arguments the model emits.
+  private inputSchemaLookup: Record<string, IJsonSchema> = {}
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
 
@@ -158,6 +162,13 @@ export class MCPProxy {
     const { tools, openApiLookup } = converter.convertToMCPTools()
     this.tools = tools
     this.openApiLookup = openApiLookup
+    // Mirror openApiLookup's keying so each tool's flattened inputSchema is
+    // reachable by the incoming tool name at call time.
+    for (const [apiName, def] of Object.entries(tools)) {
+      for (const method of def.methods) {
+        this.inputSchemaLookup[`${apiName}-${method.name}`] = method.inputSchema
+      }
+    }
     this.writeGatePolicy = loadWriteGatePolicy()
 
     this.setupHandlers()
@@ -210,11 +221,17 @@ export class MCPProxy {
       // See: https://github.com/makenotion/notion-mcp-server/issues/176
       const deserializedParams = params ? deserializeParams(params as Record<string, unknown>) : {}
 
+      // Repair format-instruction violations the model made against the tool's
+      // own schema (wrong scalar type, enum casing/whitespace, non-ISO dates) —
+      // the failure class measured by IFEval-FC (arXiv:2509.18420v1). No-op when
+      // no schema is available, so schema-agnostic callers are unaffected.
+      const finalParams = coerceParamFormats(deserializedParams, this.inputSchemaLookup[name])
+
       // Deterministic pre-execution write gate: inspect the proposed call against
       // the operator's policy before any write reaches the Notion API. A denial
       // returns a structured error (same shape as HttpClientError) instead of
       // executing, deterministically preventing policy-violating writes.
-      const gateDecision = evaluateWriteGate(operation, deserializedParams, this.writeGatePolicy)
+      const gateDecision = evaluateWriteGate(operation, finalParams, this.writeGatePolicy)
       if (!gateDecision.allowed) {
         console.warn('Pre-execution write gate denied operation', {
           operationId: operation.operationId,
@@ -235,7 +252,7 @@ export class MCPProxy {
 
       try {
         // Execute the operation
-        const response = await this.httpClient.executeOperation(operation, deserializedParams)
+        const response = await this.httpClient.executeOperation(operation, finalParams)
 
         // Convert response to MCP format
         return {
