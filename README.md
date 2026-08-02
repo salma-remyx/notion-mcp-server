@@ -552,3 +552,35 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+### Tool-output compaction (optional)
+
+A large Notion page, search result, or data-source query can balloon the tool
+output an agent has to hold in context — the "quadratic token cost" failure
+mode for tool-using agents. The server ships an optional **validated
+compaction** stage (adapted from research on Agentic Context Management) that
+compacts a response to a budget *at structural boundaries* — whole list items
+are elided and over-long strings trimmed — rather than by slicing the
+serialized document. Every retained item stays intact and each elision records
+its provenance (`kept`/`elided` counts), so the agent can see what was dropped
+and fetch it back if it turns out to matter. This buys linear token cost
+without the accuracy cliff of naive truncation.
+
+Compaction is **off by default** (zero behavior change). Enable it with the
+`NOTION_OUTPUT_COMPACTION` environment variable:
+
+```bash
+# Enable with the default budget (~8k chars / ~2k tokens; 20 items/array;
+# 480 chars/string). Responses at or under the budget pass through untouched.
+NOTION_OUTPUT_COMPACTION=true npx @notionhq/notion-mcp-server
+
+# Override any of the limits:
+NOTION_OUTPUT_COMPACTION='{"enabled":true,"maxChars":4096,"maxArrayItems":10,"maxStringLength":240}' \
+  npx @notionhq/notion-mcp-server
+```
+
+When a response exceeds `maxChars`, every array longer than `maxArrayItems`
+has its tail replaced by a `{ "_compaction": { "kept": N, "elided": K } }`
+provenance marker, and every string longer than `maxStringLength` is trimmed
+with a `[+N chars elided]` suffix. Responses within budget are returned
+byte-for-byte unchanged, so small responses are never touched.
+

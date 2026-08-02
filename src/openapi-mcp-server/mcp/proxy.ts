@@ -4,6 +4,7 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import { compactResponse, loadCompactionPolicy, type CompactionPolicy } from './compaction'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -132,6 +133,8 @@ export class MCPProxy {
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
+  // Optional tool-output compaction policy (default off — see compaction.ts).
+  private compactionPolicy: CompactionPolicy
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -159,6 +162,7 @@ export class MCPProxy {
     this.tools = tools
     this.openApiLookup = openApiLookup
     this.writeGatePolicy = loadWriteGatePolicy()
+    this.compactionPolicy = loadCompactionPolicy()
 
     this.setupHandlers()
   }
@@ -237,12 +241,33 @@ export class MCPProxy {
         // Execute the operation
         const response = await this.httpClient.executeOperation(operation, deserializedParams)
 
+        // Optional validated compaction of ballooning tool outputs to a token
+        // budget (ACM "compacting & consolidation" primitive — see compaction.ts).
+        // Off by default; on any failure the raw response is returned so
+        // compaction can never break the call path.
+        let payload: unknown = response.data
+        try {
+          const { data, stats } = compactResponse(response.data, this.compactionPolicy)
+          if (stats.compacted) {
+            console.warn('Compacted tool output', {
+              operationId: operation.operationId,
+              originalChars: stats.originalChars,
+              compactedChars: stats.compactedChars,
+              elidedArrays: stats.elidedArrays,
+              truncatedStrings: stats.truncatedStrings,
+            })
+          }
+          payload = data
+        } catch (compactionError) {
+          console.error('Compaction failed, returning raw response', compactionError instanceof Error ? compactionError.message : 'Unknown error')
+        }
+
         // Convert response to MCP format
         return {
           content: [
             {
               type: 'text', // currently this is the only type that seems to be used by mcp server
-              text: JSON.stringify(response.data), // TODO: pass through the http status code text?
+              text: JSON.stringify(payload), // TODO: pass through the http status code text?
             },
           ],
         }
