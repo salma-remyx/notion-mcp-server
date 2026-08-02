@@ -24,7 +24,14 @@ observed_landing_zones:
       entry point scripts/start-server.ts -> initProxy(
     branch: instruction-following-evaluation-in-function-calling-for-lar
     timestamp: '2026-08-01T14:33:47Z'
-  last_observed: '2026-08-01T14:33:47Z'
+  - arxiv: 2607.21503v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: The MCPProxy CallToolRequestSchema handler in src/openapi-mcp-server/mcp/proxy.ts
+      (compactResponse invoked at proxy.ts:250 on every successful tool response).
+      Reached via src/init-server.ts:51 (new MC
+    branch: agentic-context-management-solving-agent-memory-and-cost-by-
+    timestamp: '2026-08-02T19:10:40Z'
+  last_observed: '2026-08-02T19:10:40Z'
 - path: src/openapi-mcp-server/openapi/
   shape_tags:
   - unclassified
@@ -45,4 +52,4 @@ rejected_shapes:
   - arxiv: 2607.19257v1
     timestamp: '2026-07-30T17:29:36Z'
 coordination_signals: []
-last_updated: '2026-08-01T14:33:47Z'
+last_updated: '2026-08-02T19:10:40Z'
