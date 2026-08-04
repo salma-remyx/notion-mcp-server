@@ -43,7 +43,14 @@ observed_landing_zones:
       inside convertToMCPTools(), consumed by MCPProxy.setupHandler
     branch: prompt-design-at-scale-how-format-instruction-count-and-cont
     timestamp: '2026-08-01T00:08:38Z'
-  last_observed: '2026-08-01T00:08:38Z'
+  - arxiv: 2607.18847v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: OpenAPIToMCPConverter.convertToMCPTools() in src/openapi-mcp-server/openapi/parser.ts,
+      invoked from MCPProxy.setupHandlers() at src/openapi-mcp-server/mcp/proxy.ts:157-158,
+      itself reached from init-se
+    branch: data-leakage-prevention-in-agentic-applications-via-preempti
+    timestamp: '2026-08-04T19:21:32Z'
+  last_observed: '2026-08-04T19:21:32Z'
 rejected_shapes:
 - shape_tag: null
   reason_code: null
@@ -52,4 +59,4 @@ rejected_shapes:
   - arxiv: 2607.19257v1
     timestamp: '2026-07-30T17:29:36Z'
 coordination_signals: []
-last_updated: '2026-08-02T19:10:40Z'
+last_updated: '2026-08-04T19:21:32Z'
