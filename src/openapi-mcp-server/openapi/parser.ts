@@ -1,5 +1,6 @@
 import type { OpenAPIV3, OpenAPIV3_1 } from 'openapi-types'
 import type { JSONSchema7 as IJsonSchema } from 'json-schema'
+import { tightenInputSchema, loadSchemaHardeningPolicy, type SchemaHardeningPolicy } from './schema-hardening'
 
 type NewToolMethod = {
   name: string
@@ -12,7 +13,10 @@ export class OpenAPIToMCPConverter {
   private schemaCache: Record<string, IJsonSchema> = {}
   private nameCounter: number = 0
 
-  constructor(private openApiSpec: OpenAPIV3.Document | OpenAPIV3_1.Document) {}
+  constructor(
+    private openApiSpec: OpenAPIV3.Document | OpenAPIV3_1.Document,
+    private schemaHardeningPolicy: SchemaHardeningPolicy = loadSchemaHardeningPolicy(),
+  ) {}
 
   /**
    * Resolve a $ref reference to its schema in the openApiSpec.
@@ -257,7 +261,7 @@ export class OpenAPIToMCPConverter {
 
     const methodName = operation.operationId
 
-    const inputSchema: IJsonSchema & { type: 'object' } = {
+    let inputSchema: IJsonSchema & { type: 'object' } = {
       $defs: this.convertComponentsToJsonSchema(),
       type: 'object',
       properties: {},
@@ -324,6 +328,14 @@ export class OpenAPIToMCPConverter {
           }
         }
       }
+    }
+
+    // Preemptive schema hardening (off by default; opt in via
+    // NOTION_SCHEMA_HARDENING). Tightens the per-tool inputSchema — e.g. turns
+    // the advisory `format: uuid` on id fields into an enforceable `pattern` —
+    // so the MCP input validator rejects malformed ids at the schema boundary.
+    if (this.schemaHardeningPolicy.enabled) {
+      inputSchema = tightenInputSchema(inputSchema, this.schemaHardeningPolicy)
     }
 
     // Build description including error responses

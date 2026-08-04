@@ -552,3 +552,47 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+### Schema hardening (preemptive input tightening)
+
+The tool schemas the server exposes are also the boundary the MCP layer
+validates every call against before it reaches the Notion API. The server ships
+an optional **preemptive schema-hardening pass** (adapted from research on data
+leakage prevention in agentic applications via preemptive hardening) that
+tightens each tool's `inputSchema` at generation time — turning *advisory*
+constraints into *enforceable* ones so leakage-enabling inputs are rejected at
+the schema boundary rather than caught at runtime.
+
+Notion's OpenAPI spec declares resource ids (`page_id`, `database_id`,
+`block_id`, …) with `format: "uuid"`, but `format` is only a hint that the MCP
+input validator does not reject on. When enabled, the pass adds an enforceable
+UUID `pattern` (and a length cap) to those fields, and bounds otherwise-
+unbounded free-text strings with a generous `maxLength`. Because the constraints
+only encode what every legitimate Notion value already satisfies, they reject
+malformed/injected values without disrupting intended behavior.
+
+The pass is **off by default** (zero behavior change). Enable it with the
+`NOTION_SCHEMA_HARDENING` environment variable:
+
+```bash
+# Enable both rules (UUID-pattern tightening + free-text length bounding)
+NOTION_SCHEMA_HARDENING=true npx @notionhq/notion-mcp-server
+
+# Toggle rules individually via a JSON object
+NOTION_SCHEMA_HARDENING='{"enabled":true,"boundStringFields":false}' \
+  npx @notionhq/notion-mcp-server
+```
+
+Two rules are applied, recursively through each tool schema (including nested
+`$defs`):
+
+- **id-format tightening** — adds a UUID `pattern` + `maxLength` to id-shaped
+  string fields (those declared `format: "uuid"`, or named `id` / ending in
+  `_id`). A 32-hex Notion id and a dashed UUID both pass; anything else is
+  rejected before the call is made.
+- **boundary sanitization** — adds a generous `maxLength` to free-text string
+  fields that carry no length bound, blocking unbounded payloads while staying
+  well above any legitimate value size.
+
+This is a static, generation-time mitigation (no continuous runtime policy
+enforcement) and complements the runtime `NOTION_WRITE_GATE` above.
+
