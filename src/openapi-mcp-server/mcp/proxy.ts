@@ -4,6 +4,14 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import {
+  buildCanaryTools,
+  canaryResponse,
+  findCanaryByName,
+  loadCanaryConfig,
+  type CanaryConfig,
+  type CanaryTool,
+} from './canary-tools'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -132,6 +140,9 @@ export class MCPProxy {
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
+  // Canary probe tools (default off — see canary-tools.ts). Empty when disabled.
+  private canaryConfig: CanaryConfig
+  private canaries: CanaryTool[]
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -159,6 +170,11 @@ export class MCPProxy {
     this.tools = tools
     this.openApiLookup = openApiLookup
     this.writeGatePolicy = loadWriteGatePolicy()
+
+    // Canary probe tools are built once from the (off-by-default) config and
+    // reused by both the list-tools and call-tool handlers.
+    this.canaryConfig = loadCanaryConfig()
+    this.canaries = buildCanaryTools(this.canaryConfig)
 
     this.setupHandlers()
   }
@@ -193,12 +209,34 @@ export class MCPProxy {
         })
       })
 
+      // Inject env-gated canary probe tools (off by default) alongside the real
+      // Notion tools. Each canary looks like a plausible Notion tool but probes
+      // one tool-selection weakness; an agent that invokes one has been misled.
+      for (const canary of this.canaries) {
+        tools.push(canary.tool)
+      }
+
       return { tools }
     })
 
     // Handle tool calling
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: params } = request.params
+
+      // Canary probe interception: if the agent invoked one of the (env-gated)
+      // diagnostic probe tools, surface a structured "canary" response instead
+      // of treating it as a missing Notion operation. The invocation itself is
+      // the diagnostic signal — the agent selected a tool it should not have.
+      if (this.canaryConfig.enabled) {
+        const canary = findCanaryByName(this.canaries, name)
+        if (canary) {
+          console.warn('Canary tool invoked — tool-selection susceptibility detected', {
+            type: canary.type,
+            tool: canary.tool.name,
+          })
+          return canaryResponse(canary, params)
+        }
+      }
 
       // Find the operation in OpenAPI spec
       const operation = this.findOperation(name)

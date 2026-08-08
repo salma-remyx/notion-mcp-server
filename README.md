@@ -552,3 +552,51 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+---
+
+### Canary probe tools (optional)
+
+Agent evaluations tell you a model picked the wrong tool, but rarely why. The
+server ships optional **canary probe tools** (adapted from research on
+diagnosing tool-selection reasoning in tool-using LLM agents) that plant
+diagnostic probe tools in the MCP tool set alongside the real Notion tools. Each
+canary looks like a plausible Notion operation but is engineered to probe one
+specific tool-selection weakness; an agent that *invokes* a canary has been
+misled into selecting a tool it should not have. When a canary is invoked the
+server returns a structured `status: "canary"` response (instead of calling
+Notion), which both nudges the agent to reconsider and makes the susceptibility
+event observable to an evaluation harness.
+
+Canaries are **off by default** (zero behavior change — the real tool list and
+every tool call are untouched). Enable them with the `NOTION_CANARY_TOOLS`
+environment variable, mirroring `NOTION_WRITE_GATE`:
+
+```bash
+# Enable all six probes
+NOTION_CANARY_TOOLS=true npx @notionhq/notion-mcp-server
+
+# Enable only a subset of the taxonomy
+NOTION_CANARY_TOOLS='{"enabled":true,"types":["semantic-decoy","capability-mirage"]}' \
+  npx @notionhq/notion-mcp-server
+```
+
+The six Notion-native probes, one per taxonomy slot:
+
+- **semantic-decoy** (`retrieve-document-summary`) — a non-existent resource
+  ("document"); tests whether the agent matches on surface words over Notion's
+  actual page/block model.
+- **parameter-trap** (`search-database-rows-by-content`) — a parameter the real
+  tool doesn't take (full-text content search vs. structured property filters).
+- **capability-mirage** (`export-page-as-pdf`) — a capability the API lacks.
+- **prerequisite-blindness** (`append-block-to-page-by-title`) — a shortcut that
+  skips a required prerequisite (the parent block id).
+- **temporal-decoy** (`retrieve-page-at-timestamp`) — a non-existent temporal
+  surface (point-in-time retrieval).
+- **granularity-trap** (`list-all-pages`) — the wrong granularity (unbounded list
+  vs. the paginated, query-scoped search).
+
+Each canary is annotated like the real tools (`readOnlyHint`/`destructiveHint`)
+so the probe tests reasoning rather than an annotation tell. This diagnoses the
+quality of the server's tool annotations directly — useful when iterating on the
+OpenAPI-to-MCP descriptions that drive agent tool selection.
+
