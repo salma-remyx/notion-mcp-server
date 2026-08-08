@@ -31,7 +31,14 @@ observed_landing_zones:
       Reached via src/init-server.ts:51 (new MC
     branch: agentic-context-management-solving-agent-memory-and-cost-by-
     timestamp: '2026-08-02T19:10:40Z'
-  last_observed: '2026-08-02T19:10:40Z'
+  - arxiv: 2608.04719v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: "MCPProxy in src/openapi-mcp-server/mcp/proxy.ts \u2014 the\
+      \ new module is invoked from the class constructor and the pre-existing ListTools/CallTool\
+      \ request handlers (the tool-listing call site the SPEC cit"
+    branch: diagnosing-tool-selection-reasoning-in-llm-agents-with-canar
+    timestamp: '2026-08-08T06:56:48Z'
+  last_observed: '2026-08-08T06:56:48Z'
 - path: src/openapi-mcp-server/openapi/
   shape_tags:
   - unclassified
@@ -63,4 +70,4 @@ rejected_shapes:
   - arxiv: 2503.14432v2
     timestamp: '2026-08-06T03:49:30Z'
 coordination_signals: []
-last_updated: '2026-08-06T03:49:30Z'
+last_updated: '2026-08-08T06:56:48Z'
