@@ -38,7 +38,14 @@ observed_landing_zones:
       \ request handlers (the tool-listing call site the SPEC cit"
     branch: diagnosing-tool-selection-reasoning-in-llm-agents-with-canar
     timestamp: '2026-08-08T06:56:48Z'
-  last_observed: '2026-08-08T06:56:48Z'
+  - arxiv: 2607.22445v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: "The MCPProxy CallTool handler in src/openapi-mcp-server/mcp/proxy.ts\
+      \ \u2014 evaluateCapabilityScope() runs immediately after the existing evaluateWriteGate()\
+      \ (proxy.ts:225) on every tool call. Reached from"
+    branch: dynamic-capability-scoping-for-enterprise-ai-agents-a-synthe
+    timestamp: '2026-08-09T01:40:42Z'
+  last_observed: '2026-08-09T01:40:42Z'
 - path: src/openapi-mcp-server/openapi/
   shape_tags:
   - unclassified
@@ -70,4 +77,4 @@ rejected_shapes:
   - arxiv: 2503.14432v2
     timestamp: '2026-08-06T03:49:30Z'
 coordination_signals: []
-last_updated: '2026-08-08T06:56:48Z'
+last_updated: '2026-08-09T01:40:42Z'
