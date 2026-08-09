@@ -552,3 +552,52 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+---
+
+### Dynamic capability scoping (optional)
+
+Each Notion integration token unlocks the full tool surface for every task it
+performs — a read-only "summarize the meeting notes" request holds the same
+`delete-a-block` / `patch-page` capabilities as a "reorganize the workspace"
+one. That persistent over-privilege is the attack surface dynamic
+least-privilege targets: _a credential that does not exist in an agent's
+context cannot be misused._ The server ships an optional **dynamic
+capability-scope gate** (adapted from research on dynamic capability scoping
+for enterprise AI agents) that, on each call, computes the narrowest scope the
+task needs and denies — or, in observe-only mode, records — any operation
+outside it.
+
+The gate is **off by default** (zero behavior change). Enable it with the
+`NOTION_CAPABILITY_SCOPE` environment variable. It runs _after_ the
+pre-execution write gate and composes with it.
+
+```bash
+# Source #1 — role-based ceiling: cap this credential at a permission tier.
+# Ops above the tier (read < comment < write < destructive) are out of scope.
+NOTION_CAPABILITY_SCOPE='{"enabled":true,"roleCeiling":"read"}' \
+  npx @notionhq/notion-mcp-server
+
+# Source #2 — task-context classifier: describe the task; the gate derives the
+# max tier it needs and takes the most-restrictive bound vs. the role ceiling,
+# so a powerful credential still can't exceed what the current task requires.
+NOTION_CAPABILITY_SCOPE='{"enabled":true,"roleCeiling":"destructive","taskContext":"summarize the meeting notes"}' \
+  npx @notionhq/notion-mcp-server
+```
+
+Two modes:
+
+- **Enforcing** (`"enforce": true`, the default) — out-of-scope calls are
+  denied pre-execution and returned to the agent as a structured error
+  (prevention, not detection).
+- **Observe-only** (`"enforce": false`) — out-of-scope calls are let through
+  but the mismatch is logged as a behavioral signal, for misalignment research
+  and dry-running a policy before enforcing it.
+
+Every operation is classified into one of four Notion-native tiers — `read`
+(`GET` plus the read `POST`s `post-search`, `query-data-source`), `comment`
+(`create-a-comment`), `write` (`post-page`, `patch-page`, `move-page`, …), and
+`destructive` (`delete-a-block`, and any future `archive`/`trash` op). The
+task-context classifier is a parameter-free keyword heuristic over the task
+text. Like the write gate, this is a deterministic safety net, not
+authorization — it complements your integration's Notion _Capabilities_.
+

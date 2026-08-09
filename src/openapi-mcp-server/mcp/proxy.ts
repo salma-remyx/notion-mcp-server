@@ -4,6 +4,11 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import {
+  evaluateCapabilityScope,
+  loadCapabilityScopePolicy,
+  type CapabilityScopePolicy,
+} from './capability-scope'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -132,6 +137,8 @@ export class MCPProxy {
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
+  // Dynamic least-privilege capability-scope policy (default off — see capability-scope.ts).
+  private capabilityScopePolicy: CapabilityScopePolicy
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -159,6 +166,7 @@ export class MCPProxy {
     this.tools = tools
     this.openApiLookup = openApiLookup
     this.writeGatePolicy = loadWriteGatePolicy()
+    this.capabilityScopePolicy = loadCapabilityScopePolicy()
 
     this.setupHandlers()
   }
@@ -231,6 +239,40 @@ export class MCPProxy {
             },
           ],
         }
+      }
+
+      // Dynamic least-privilege capability scoping: compute the narrowest scope
+      // the task needs (role ceiling × task-context classifier) and deny — or, in
+      // observe-only mode, record — any operation outside it, before execution.
+      const scopeDecision = evaluateCapabilityScope(operation, deserializedParams, this.capabilityScopePolicy)
+      if (!scopeDecision.allowed) {
+        console.warn('Capability-scope gate denied operation', {
+          operationId: operation.operationId,
+          source: scopeDecision.source,
+          opTier: scopeDecision.opTier,
+          ceiling: scopeDecision.ceiling,
+        })
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                status: 'error',
+                message: `Operation denied by capability-scope gate (${scopeDecision.source}): ${scopeDecision.reason}`,
+              }),
+            },
+          ],
+        }
+      }
+      if (scopeDecision.observed) {
+        // Observe-only: the call proceeds, but the out-of-scope request is
+        // recorded as a behavioral signal (paper's observe-only deployment).
+        console.warn('Capability-scope observe-only: out-of-scope operation requested', {
+          operationId: operation.operationId,
+          source: scopeDecision.source,
+          opTier: scopeDecision.opTier,
+          ceiling: scopeDecision.ceiling,
+        })
       }
 
       try {
