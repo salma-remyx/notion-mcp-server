@@ -45,7 +45,14 @@ observed_landing_zones:
       \ (proxy.ts:225) on every tool call. Reached from"
     branch: dynamic-capability-scoping-for-enterprise-ai-agents-a-synthe
     timestamp: '2026-08-09T01:40:42Z'
-  last_observed: '2026-08-09T01:40:42Z'
+  - arxiv: 2507.19880v1
+    mode: Mode 2 (adapted port)
+    call_site_specifics: "src/openapi-mcp-server/mcp/proxy.ts \u2014 MCPProxy's tool-call\
+      \ handler (the same callTool path that already runs evaluateWriteGate), which\
+      \ executes on every MCP tool invocation before httpClient.executeOp"
+    branch: trivial-trojans-how-minimal-mcp-servers-enable-cross-tool-ex
+    timestamp: '2026-08-14T15:17:46Z'
+  last_observed: '2026-08-14T15:17:46Z'
 - path: src/openapi-mcp-server/openapi/
   shape_tags:
   - unclassified
@@ -79,4 +86,4 @@ rejected_shapes:
   - arxiv: 2607.21412v1
     timestamp: '2026-08-12T00:41:49Z'
 coordination_signals: []
-last_updated: '2026-08-12T00:41:49Z'
+last_updated: '2026-08-14T15:17:46Z'
