@@ -4,6 +4,7 @@ import { JSONSchema7 as IJsonSchema } from 'json-schema'
 import { OpenAPIToMCPConverter } from '../openapi/parser'
 import { HttpClient, HttpClientError } from '../client/http-client'
 import { evaluateWriteGate, loadWriteGatePolicy, type WriteGatePolicy } from './write-gate'
+import { evaluateExfilGate, loadExfilGatePolicy, type ExfilGatePolicy } from './exfil-gate'
 import { OpenAPIV3 } from 'openapi-types'
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
@@ -132,6 +133,8 @@ export class MCPProxy {
   private openApiLookup: Record<string, OpenAPIV3.OperationObject & { method: string; path: string }>
   // Deterministic pre-execution write gate policy (default off — see write-gate.ts).
   private writeGatePolicy: WriteGatePolicy
+  // Deterministic pre-execution exfiltration gate policy (default off — see exfil-gate.ts).
+  private exfilGatePolicy: ExfilGatePolicy
 
   /**
    * @param headers Notion API headers to authenticate with. When omitted, the
@@ -159,6 +162,7 @@ export class MCPProxy {
     this.tools = tools
     this.openApiLookup = openApiLookup
     this.writeGatePolicy = loadWriteGatePolicy()
+    this.exfilGatePolicy = loadExfilGatePolicy()
 
     this.setupHandlers()
   }
@@ -227,6 +231,30 @@ export class MCPProxy {
               text: JSON.stringify({
                 status: 'error',
                 message: `Operation denied by pre-execution write gate (${gateDecision.gate}): ${gateDecision.reason}`,
+              }),
+            },
+          ],
+        }
+      }
+
+      // Deterministic pre-execution exfiltration gate: deny calls whose params
+      // carry a URL pointing outside the allowlisted hosts. This closes the
+      // cross-tool smuggling channel where a benign-looking Notion write (a
+      // comment, a bookmark block) embeds an attacker-controlled URL that a
+      // later fetch tool would follow.
+      const exfilDecision = evaluateExfilGate(operation, deserializedParams, this.exfilGatePolicy)
+      if (!exfilDecision.allowed) {
+        console.warn('Pre-execution exfiltration gate denied operation', {
+          operationId: operation.operationId,
+          gate: exfilDecision.gate,
+        })
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                status: 'error',
+                message: `Operation denied by pre-execution exfiltration gate (${exfilDecision.gate}): ${exfilDecision.reason}`,
               }),
             },
           ],

@@ -552,3 +552,50 @@ This is a deterministic safety net, not authorization — it complements (does
 not replace) your integration's Notion _Capabilities_ and the existing
 limits on which endpoints are exposed.
 
+---
+
+### Pre-execution exfiltration gate (optional)
+
+Research on cross-tool data exfiltration via MCP ("Trivial Trojans",
+[arXiv:2507.19880](https://arxiv.org/abs/2507.19880)) shows that an agent can be
+tricked into smuggling an attacker-controlled URL through the free-text
+parameters of an otherwise-benign tool call — a comment, a page body, a bookmark
+block. The Notion API accepts the call without complaint; a second tool later
+fetches the URL, and whatever sensitive data was written alongside it leaves the
+workspace.
+
+The server ships an optional **deterministic pre-execution exfiltration gate**
+that closes this channel: before a call reaches the Notion API, every http(s)
+URL found anywhere in the deserialized parameters — top-level strings, prose
+inside `rich_text` content, bookmark/file block URLs, and values nested in
+objects and arrays — is host-checked against an allowlist. A call carrying a URL
+that points outside the allowlisted hosts is denied with a structured error
+instead of executed.
+
+The gate is **off by default** (zero behavior change). Enable it with the
+`NOTION_EXFIL_GATE` environment variable:
+
+```bash
+# Enable with the default allowlist (Notion's own hosts)
+NOTION_EXFIL_GATE=true npx @notionhq/notion-mcp-server
+
+# Restrict to your own hosts instead. Hostnames match exactly or as a
+# subdomain (`cdn.mycompany.com` matches `mycompany.com`).
+NOTION_EXFIL_GATE='{"enabled":true,"allowedUrlHosts":["mycompany.com"]}' \
+  npx @notionhq/notion-mcp-server
+```
+
+Notes:
+
+- URLs in query strings, markdown prose, and nested block payloads are all
+  inspected — the smuggling channel is any string the API will store, not a
+  dedicated `url` field.
+- The gate applies to reads and writes alike, since a URL embedded in a search
+  query or comment is as much an exfiltration channel as one in a page update.
+- A custom `allowedUrlHosts` list **replaces** the defaults (Notion hosts are no
+  longer implicitly allowed).
+- Like the write gate, this is a deterministic safety net for a specific attack
+  channel — it is not a general data-loss-prevention product.
+
+
+
