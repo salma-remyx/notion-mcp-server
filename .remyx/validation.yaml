@@ -40,3 +40,6 @@ provenance:
   held_constant: "repo_anchor:src/openapi-mcp-server/mcp/__tests__/state-aware-gate.test.ts"
   suite: "synthesized"
   avoid: "inferred"
+question:
+  kind: compare
+  ask: "the state-aware write gate blocks writes to archived resources while allowing writes to live resources and leaves reads unchanged"
