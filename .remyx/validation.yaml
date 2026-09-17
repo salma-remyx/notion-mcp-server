@@ -1,0 +1,45 @@
+loop: {max_iterations: 8, fix_code: true}
+benchmarks:
+  - name: state-aware-write-gate
+    suite: "notebook:eval/eval_state_gate.ipynb"
+    scorer: deny_rate_archived_writes
+    baseline: main
+    metrics:
+      - name: deny_rate_archived_writes
+        role: target
+        direction: max
+        threshold: 1.0
+      - name: allow_rate_live_writes
+        role: guardrail
+        direction: max
+        threshold: 1.0
+      - name: read_invariance_rate
+        role: guardrail
+        direction: max
+        threshold: 1.0
+      - name: read_no_extra_call_rate
+        role: guardrail
+        direction: max
+        threshold: 1.0
+    policy: {guardrail_veto: true}
+held_constant:
+  - "same 5 resolvable target-kind params across arms: page_id, block_id, database_id, data_source_id, comment_id"
+  - "same synthetic OpenAPIV3 write (patch) and read (get) operation stubs, matching the PR test file's patchOp/getOp helper shapes"
+  - "same explicitly-constructed policy object {enabled: true, denyWritesToArchived: true} passed directly to evaluateStateAwareGate, bypassing env-var defaults so the feature is exercised ON regardless of the arm"
+  - "same pinned tsx version (4.19.0) used to execute the TypeScript module on both arms for determinism"
+avoid:
+  - "no reliance on a live Notion API: all read/write targets are synthetic OpenAPIV3 operation objects, never real HTTP calls"
+  - "no wall-clock timing anywhere in the metric computation"
+  - "do not let npx's own download/log chatter leak into the final JSON line; only the last stdout line is treated as the result"
+compute: {tier: cpu}
+provenance:
+  deny_rate_archived_writes: "user_guidance"
+  allow_rate_live_writes: "claim_analysis:recommended.metrics"
+  read_invariance_rate: "user_guidance"
+  read_no_extra_call_rate: "claim_analysis:mismatches (reads must not round-trip); reported as a rate (1.0 = every read cell incurred zero extra readState calls) so the guardrail threshold of 1.0 is a real, satisfiable-by-baseline bound instead of a count-based threshold of 0 that a min-direction check could never fail on"
+  held_constant: "repo_anchor:src/openapi-mcp-server/mcp/__tests__/state-aware-gate.test.ts"
+  suite: "synthesized"
+  avoid: "inferred"
+question:
+  kind: compare
+  ask: "the state-aware write gate blocks writes to archived resources while allowing writes to live resources and leaves reads unchanged"
